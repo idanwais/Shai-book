@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#2a1d3d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="שי">
+<title>שי הגיבורגיש</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;background:#17121f;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+#app{width:100%;height:100%;display:flex;flex-direction:column}
+#reader{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;perspective:1800px;padding:8px;touch-action:pan-y}
+#book{position:relative;width:min(98vw,calc((100vh - 76px)*1.4143577));height:min(calc(100vh - 76px),calc(98vw/1.4143577));max-width:100%;transform-style:preserve-3d}
+.page{position:absolute;inset:0;background:white;overflow:hidden;border-radius:6px;box-shadow:0 14px 40px rgba(0,0,0,.5);backface-visibility:hidden;transform-style:preserve-3d}
+.page img{width:100%;height:100%;object-fit:contain;display:block;background:white;user-select:none;-webkit-user-drag:none}
+#front{z-index:2;transform-origin:right center}
+#under{z-index:1}
+#front.flip-forward{animation:flipForward .62s cubic-bezier(.2,.75,.22,1) forwards}
+#front.flip-back{transform-origin:left center;animation:flipBack .62s cubic-bezier(.2,.75,.22,1) forwards}
+@keyframes flipForward{0%{transform:rotateY(0);filter:brightness(1)}45%{filter:brightness(.74)}100%{transform:rotateY(105deg);filter:brightness(.5)}}
+@keyframes flipBack{0%{transform:rotateY(0);filter:brightness(1)}45%{filter:brightness(.74)}100%{transform:rotateY(-105deg);filter:brightness(.5)}}
+#bar{height:60px;display:flex;align-items:center;justify-content:center;gap:14px;color:white;padding-bottom:max(6px,env(safe-area-inset-bottom));direction:ltr}
+button{width:44px;height:44px;border:0;border-radius:999px;background:rgba(255,255,255,.14);color:white;font-size:23px;font-weight:600}
+button:disabled{opacity:.22}
+#count{min-width:115px;text-align:center;font-size:14px;direction:rtl}
+@media (orientation:portrait){#book{width:96vw;height:calc(96vw/1.4143577)}}
+
+#jumpFirst,#jumpLast{
+  position:fixed;
+  bottom:max(20px, env(safe-area-inset-bottom));
+  z-index:9999;
+  width:54px;
+  height:54px;
+  border:0;
+  border-radius:999px;
+  background:rgba(28,20,38,.88);
+  color:#fff;
+  font-size:29px;
+  font-weight:700;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 6px 18px rgba(0,0,0,.38);
+  backdrop-filter:blur(6px);
+  -webkit-backdrop-filter:blur(6px);
+}
+#jumpFirst{right:max(18px, env(safe-area-inset-right));}
+#jumpLast{left:max(18px, env(safe-area-inset-left));}
+#jumpFirst:active,#jumpLast:active{transform:scale(.96);}
+
+
+/* Reader controls v6 */
+#jumpFirst,#jumpLast{
+  transition:opacity .28s ease, transform .18s ease;
+}
+#readerControls{
+  position:fixed;
+  top:max(14px, env(safe-area-inset-top));
+  left:50%;
+  transform:translateX(-50%);
+  z-index:10001;
+  display:flex;
+  gap:10px;
+  direction:ltr;
+  transition:opacity .28s ease;
+}
+.readerCtl{
+  width:46px;height:46px;border:0;border-radius:999px;
+  background:rgba(28,20,38,.88);color:#fff;font-size:22px;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 6px 18px rgba(0,0,0,.35);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+}
+#progressTrack{
+  position:fixed;left:0;right:0;bottom:0;height:4px;
+  background:rgba(255,255,255,.16);z-index:10002;
+  opacity:1;transition:opacity .28s ease;
+}
+#progressFill{
+  height:100%;width:0%;
+  background:linear-gradient(90deg,#7d52b8,#b58bd8);
+  transition:width .22s ease;
+}
+.controls-hidden #jumpFirst,
+.controls-hidden #jumpLast,
+.controls-hidden #readerControls,
+.controls-hidden #progressTrack{opacity:0;pointer-events:none}
+#infoOverlay,#resumeOverlay{
+  position:fixed;inset:0;z-index:12000;
+  background:rgba(10,7,15,.72);
+  display:none;align-items:center;justify-content:center;
+  padding:24px;
+  backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
+}
+#infoOverlay.open,#resumeOverlay.open{display:flex}
+.modalCard{
+  width:min(520px,92vw);max-height:82vh;overflow:auto;
+  background:#fff;color:#2b2132;border-radius:22px;
+  padding:28px 28px 24px;text-align:center;direction:rtl;
+  box-shadow:0 18px 55px rgba(0,0,0,.42);
+}
+.modalCard h2{margin:0 0 10px;font-size:27px}
+.modalCard .author{font-size:18px;margin-bottom:22px}
+.modalCard p{font-size:17px;line-height:1.65;margin:12px 0}
+.modalCard .copyright{font-size:14px;margin-top:22px;opacity:.72}
+.supportBox{margin-top:24px;padding-top:20px;border-top:1px solid rgba(52,39,67,.16)}
+.supportBox h3{font-size:19px;margin:0 0 8px;color:#342743}
+.supportBox p{font-size:15px;line-height:1.55;margin:7px 0}
+.supportAmounts{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px;direction:rtl}
+.supportBtn{display:inline-flex;align-items:center;justify-content:center;min-width:62px;min-height:42px;padding:8px 13px;border-radius:13px;background:#6f4a96;color:#fff;text-decoration:none;font-size:15px;font-weight:700;border:0}
+.supportBtn.other{min-width:94px;background:#342743}
+.modalActions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:22px}
+.modalBtn{
+  width:auto;height:auto;min-height:44px;padding:10px 18px;border-radius:14px;
+  background:#342743;color:#fff;font-size:16px;
+}
+#zoomLayer{
+  position:absolute;inset:0;z-index:20;
+  transform-origin:center center;
+  will-change:transform;
+}
+#reader.zooming{overflow:hidden}
+#reader.zooming #book{overflow:visible}
+#tapLeft,#tapRight{
+  position:absolute;top:0;bottom:0;width:22%;z-index:15;
+  background:transparent;
+}
+#tapLeft{left:0}
+#tapRight{right:0}
+@media (max-width:700px){
+  .readerCtl{width:42px;height:42px;font-size:20px}
+  #jumpFirst,#jumpLast{width:50px;height:50px}
+}
+
+
+/* v7: controls at the book's upper corners + better standalone iPad viewport */
+html,body{
+  width:100%;
+  height:100%;
+  min-height:100%;
+  margin:0;
+  padding:0;
+  overflow:hidden;
+}
+body{
+  min-height:100dvh;
+}
+#reader{
+  width:100vw !important;
+  height:100dvh !important;
+  max-width:none !important;
+  max-height:none !important;
+  padding:0 !important;
+  margin:0 !important;
+  box-sizing:border-box;
+}
+#book{
+  max-width:100vw !important;
+  max-height:100dvh !important;
+}
+#readerControls{
+  position:fixed;
+  inset:0;
+  transform:none;
+  z-index:10001;
+  display:block;
+  pointer-events:none;
+}
+#readerControls .readerCtl{
+  position:fixed;
+  top:max(14px, env(safe-area-inset-top));
+  pointer-events:auto;
+}
+#fullscreenBtn{
+  right:max(16px, env(safe-area-inset-right));
+}
+#infoBtn{
+  left:max(16px, env(safe-area-inset-left));
+}
+@supports not (height:100dvh){
+  #reader{height:100vh !important;}
+  #book{max-height:100vh !important;}
+}
+@media (display-mode: standalone){
+  html,body,#reader{
+    width:100vw !important;
+    height:100dvh !important;
+    min-height:100dvh !important;
+  }
+}
+
+
+.supportMethod{margin-top:16px}
+.supportMethodTitle{font-size:16px;font-weight:800;color:#342743;margin-bottom:5px}
+.supportHint{font-size:13px!important;opacity:.78;margin:4px 0 10px!important}
+.supportWide{min-width:180px;padding-left:18px;padding-right:18px}
+.paypalMethod{margin-top:18px;padding-top:14px;border-top:1px solid rgba(52,39,67,.10)}
+
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="reader"><div id="zoomLayer"><div id="book">
+    <div id="under" class="page"><img id="underImg" alt=""></div>
+    <div id="front" class="page"><img id="frontImg" alt=""></div>
+  </div><div id="tapLeft" aria-hidden="true"></div><div id="tapRight" aria-hidden="true"></div></div></div>
+  <div id="bar">
+    <button id="prev" aria-label="עמוד קודם">‹</button>
+    <div id="count"></div>
+    <button id="next" aria-label="עמוד הבא">›</button>
+  </div>
+</div>
+
+<button id="jumpFirst" aria-label="לעמוד הראשון" title="לעמוד הראשון">⇥</button>
+<button id="jumpLast" aria-label="לעמוד האחרון" title="לעמוד האחרון">⇤</button>
+
+
+<div id="readerControls">
+  <button class="readerCtl" id="fullscreenBtn" aria-label="מסך מלא" title="מסך מלא">⛶</button>
+  <button class="readerCtl" id="infoBtn" aria-label="מידע" title="מידע">ⓘ</button>
+</div>
+<div id="progressTrack"><div id="progressFill"></div></div>
+
+<div id="infoOverlay" role="dialog" aria-modal="true" aria-label="מידע על הספר">
+  <div class="modalCard">
+    <h2>שי הגיבורגיש</h2>
+    <div class="author">מאת: עידן וייסמן</div>
+    <p>סיפור על ילדה שמגלה שלפעמים הדבר שהכי קשה לנו בעצמנו יכול להיות גם אחד הכוחות הגדולים שלנו.</p>
+    <div class="copyright">© 2026 עידן וייסמן<br>כל הזכויות שמורות.</div>
+    <div class="supportBox">
+      <h3>הספר הזה ניתן לקריאה בחינם ❤️</h3>
+      <p>אם נהניתם ממנו ותרצו לתמוך ביצירה של ספרים נוספים, אפשר לבחור בדרך שנוחה לכם.</p>
+      <p>התמיכה היא לבחירתכם בלבד, והספר נשאר חופשי לקריאה לכולם.</p>
+
+      <div class="supportMethod">
+        <div class="supportMethodTitle">PayBox</div>
+        <p class="supportHint">בקבוצת התמיכה אפשר לבחור ₪10, ₪20, ₪30, ₪40 או כל סכום אחר.</p>
+        <a class="supportBtn supportWide" href="https://links.payboxapp.com/mcT9DBeM85b" target="_blank" rel="noopener noreferrer">תמיכה דרך PayBox</a>
+      </div>
+
+      <div class="supportMethod paypalMethod">
+        <div class="supportMethodTitle">PayPal</div>
+        <div class="supportAmounts">
+          <a class="supportBtn" href="https://www.paypal.me/Idanwaisman/10ILS" target="_blank" rel="noopener noreferrer">₪10</a>
+          <a class="supportBtn" href="https://www.paypal.me/Idanwaisman/20ILS" target="_blank" rel="noopener noreferrer">₪20</a>
+          <a class="supportBtn" href="https://www.paypal.me/Idanwaisman/30ILS" target="_blank" rel="noopener noreferrer">₪30</a>
+          <a class="supportBtn" href="https://www.paypal.me/Idanwaisman/40ILS" target="_blank" rel="noopener noreferrer">₪40</a>
+          <a class="supportBtn other" href="https://www.paypal.me/Idanwaisman" target="_blank" rel="noopener noreferrer">סכום אחר</a>
+        </div>
+      </div>
+    </div>
+    <div class="modalActions"><button class="modalBtn" id="closeInfo">סגירה</button></div>
+  </div>
+</div>
+
+<div id="resumeOverlay" role="dialog" aria-modal="true" aria-label="המשך קריאה">
+  <div class="modalCard">
+    <h2>להמשיך לקרוא?</h2>
+    <p>הספר זוכר את המקום שבו הפסקת.</p>
+    <div class="modalActions">
+      <button class="modalBtn" id="resumeReading">להמשיך מהמקום האחרון</button>
+      <button class="modalBtn" id="restartReading">להתחיל מההתחלה</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const PAGES = [
+  "./pages/page-001.jpg",
+  "./pages/page-002.jpg",
+  "./pages/page-003.jpg",
+  "./pages/page-004.jpg",
+  "./pages/page-005.jpg",
+  "./pages/page-006.jpg",
+  "./pages/page-007.jpg",
+  "./pages/page-008.jpg",
+  "./pages/page-009.jpg",
+  "./pages/page-010.jpg",
+  "./pages/page-011.jpg",
+  "./pages/page-012.jpg",
+  "./pages/page-013.jpg",
+  "./pages/page-014.jpg",
+  "./pages/page-015.jpg",
+  "./pages/page-016.jpg",
+  "./pages/page-017.jpg",
+  "./pages/page-018.jpg",
+  "./pages/page-019.jpg",
+  "./pages/page-020.jpg",
+  "./pages/page-021.jpg",
+  "./pages/page-022.jpg",
+  "./pages/page-023.jpg",
+  "./pages/page-024.jpg",
+  "./pages/page-025.jpg",
+  "./pages/page-026.jpg",
+  "./pages/page-027.jpg",
+  "./pages/page-028.jpg",
+  "./pages/page-029.jpg",
+  "./pages/page-030.jpg",
+  "./pages/page-031.jpg",
+  "./pages/page-032.jpg",
+  "./pages/page-033.jpg",
+  "./pages/page-034.jpg",
+  "./pages/page-035.jpg",
+  "./pages/page-036.jpg",
+  "./pages/page-037.jpg",
+  "./pages/page-038.jpg",
+  "./pages/page-039.jpg",
+  "./pages/page-040.jpg",
+  "./pages/page-041.jpg",
+  "./pages/page-042.jpg",
+  "./pages/page-043.jpg",
+  "./pages/page-044.jpg",
+  "./pages/page-045.jpg",
+  "./pages/page-046.jpg",
+  "./pages/page-047.jpg",
+  "./pages/page-048.jpg",
+  "./pages/page-049.jpg",
+  "./pages/page-050.jpg",
+  "./pages/page-051.jpg",
+  "./pages/page-052.jpg",
+  "./pages/page-053.jpg",
+  "./pages/page-054.jpg",
+  "./pages/page-055.jpg",
+  "./pages/page-056.jpg",
+  "./pages/page-057.jpg",
+  "./pages/page-058.jpg",
+  "./pages/page-059.jpg",
+  "./pages/page-060.jpg",
+  "./pages/page-061.jpg",
+  "./pages/page-062.jpg",
+  "./pages/page-063.jpg",
+  "./pages/page-064.jpg",
+  "./pages/page-065.jpg",
+  "./pages/page-066.jpg",
+  "./pages/page-067.jpg",
+  "./pages/page-068.jpg",
+  "./pages/page-069.jpg",
+  "./pages/page-070.jpg",
+  "./pages/page-071.jpg",
+  "./pages/page-072.jpg"
+];
+let current=parseInt(localStorage.getItem('shir-page-v2')||'0',10);
+if(!Number.isFinite(current)||current<0||current>=PAGES.length) current=0;
+let busy=false;
+
+const front=document.getElementById('front');
+const under=document.getElementById('under');
+const frontImg=document.getElementById('frontImg');
+const underImg=document.getElementById('underImg');
+const count=document.getElementById('count');
+const prev=document.getElementById('prev');
+const next=document.getElementById('next');
+const reader=document.getElementById('reader');
+const jumpFirst=document.getElementById('jumpFirst');
+const jumpLast=document.getElementById('jumpLast');
+const zoomLayer=document.getElementById('zoomLayer');
+const tapLeft=document.getElementById('tapLeft');
+const tapRight=document.getElementById('tapRight');
+const infoBtn=document.getElementById('infoBtn');
+const fullscreenBtn=document.getElementById('fullscreenBtn');
+const infoOverlay=document.getElementById('infoOverlay');
+const closeInfo=document.getElementById('closeInfo');
+const resumeOverlay=document.getElementById('resumeOverlay');
+const resumeReading=document.getElementById('resumeReading');
+const restartReading=document.getElementById('restartReading');
+const progressFill=document.getElementById('progressFill');
+
+const warmedPages=new Set();
+function warmPage(i){
+  if(i<0||i>=PAGES.length||warmedPages.has(i)) return;
+  warmedPages.add(i);
+  fetch(PAGES[i],{cache:'force-cache'}).catch(()=>warmedPages.delete(i));
+}
+function warmNearby(){
+  // Keep only nearby pages hot; the service worker stores the full book compressed for offline use.
+  [current-2,current-1,current,current+1,current+2].forEach(warmPage);
+}
+function paint(){
+  front.className='page';
+  front.style.transformOrigin='right center';
+  frontImg.src=PAGES[current];
+  underImg.src=PAGES[Math.min(current+1,PAGES.length-1)];
+  count.textContent=`עמוד ${current+1} מתוך ${PAGES.length}`;
+  prev.disabled=current===0;
+  next.disabled=current===PAGES.length-1;
+  localStorage.setItem('shir-page-v2',String(current));
+  progressFill.style.width=((current)/(Math.max(1,PAGES.length-1))*100)+'%';
+  if('requestIdleCallback' in window) requestIdleCallback(warmNearby,{timeout:700});
+  else setTimeout(warmNearby,80);
+}
+
+function goNext(){
+  if(scale>1.01)return;
+  if(busy||current>=PAGES.length-1)return;
+  busy=true;
+  underImg.src=PAGES[current+1];
+  front.style.transformOrigin='right center';
+  front.classList.add('flip-forward');
+  setTimeout(()=>{current++;busy=false;paint()},620);
+}
+
+function goPrev(){
+  if(scale>1.01)return;
+  if(busy||current<=0)return;
+  busy=true;
+  underImg.src=PAGES[current-1];
+  front.style.transformOrigin='left center';
+  front.classList.add('flip-back');
+  setTimeout(()=>{current--;busy=false;paint()},620);
+}
+
+prev.onclick=goNext;
+next.onclick=goPrev;
+
+jumpFirst.onclick=()=>{
+  if(busy || current===0) return;
+  current=0;
+  resetZoom();
+  paint();
+};
+
+jumpLast.onclick=()=>{
+  if(busy || current===PAGES.length-1) return;
+  current=PAGES.length-1;
+  resetZoom();
+  paint();
+};
+
+let sx=0,sy=0;
+reader.addEventListener('touchstart',e=>{
+  const t=e.touches[0];sx=t.clientX;sy=t.clientY;
+},{passive:true});
+
+reader.addEventListener('touchend',e=>{
+  const t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy;
+  if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.2){
+    // User requested left-to-right page progression:
+    // swipe right = next page, swipe left = previous page.
+    if(dx>0)goNext();else goPrev();
+  }
+},{passive:true});
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight')goNext();
+  if(e.key==='ArrowLeft')goPrev();
+});
+
+
+// --- Reader experience enhancements ---
+let controlsTimer=null;
+function showControls(){
+  document.body.classList.remove('controls-hidden');
+  clearTimeout(controlsTimer);
+  controlsTimer=setTimeout(()=>document.body.classList.add('controls-hidden'),3000);
+}
+function hideControlsSoon(){
+  clearTimeout(controlsTimer);
+  controlsTimer=setTimeout(()=>document.body.classList.add('controls-hidden'),1800);
+}
+document.addEventListener('pointerdown',showControls,{passive:true});
+
+// Tap page edges. Existing swipe direction is preserved.
+// In this book: rightward swipe = next, leftward swipe = previous.
+// Matching the requested Hebrew-facing controls: right edge = previous, left edge = next.
+tapLeft.addEventListener('click',e=>{ if(scale===1){e.stopPropagation();goNext();showControls();} });
+tapRight.addEventListener('click',e=>{ if(scale===1){e.stopPropagation();goPrev();showControls();} });
+
+// Information dialog
+infoBtn.onclick=(e)=>{e.stopPropagation();infoOverlay.classList.add('open');showControls();};
+closeInfo.onclick=()=>infoOverlay.classList.remove('open');
+infoOverlay.addEventListener('click',e=>{if(e.target===infoOverlay)infoOverlay.classList.remove('open')});
+
+// Fullscreen: browsers that support the Fullscreen API use it.
+// On iPad Safari, when installed to Home Screen the existing PWA meta tags open it app-like/fullscreen.
+fullscreenBtn.onclick=async(e)=>{
+  e.stopPropagation();
+  try{
+    if(document.fullscreenElement){
+      await document.exitFullscreen();
+    }else if(document.documentElement.requestFullscreen){
+      await document.documentElement.requestFullscreen();
+    }else{
+      alert('באייפד: כדי לפתוח ללא שורת הדפדפן, בחר שיתוף → הוסף למסך הבית, ופתח את הספר מהאייקון שנוצר.');
+    }
+  }catch(_){
+    alert('באייפד: כדי לפתוח ללא שורת הדפדפן, בחר שיתוף → הוסף למסך הבית, ופתח את הספר מהאייקון שנוצר.');
+  }
+};
+document.addEventListener('fullscreenchange',showControls);
+
+// Resume prompt only when there is a meaningful saved position.
+const savedAtStart=current;
+if(savedAtStart>0 && savedAtStart<PAGES.length-1){
+  setTimeout(()=>resumeOverlay.classList.add('open'),250);
+}
+resumeReading.onclick=()=>{resumeOverlay.classList.remove('open');showControls();};
+restartReading.onclick=()=>{
+  current=0;resetZoom();paint();resumeOverlay.classList.remove('open');showControls();
+};
+
+// Pinch-to-zoom and pan.
+let scale=1, tx=0, ty=0, pinchStartDist=0, pinchStartScale=1;
+let panStartX=0,panStartY=0,panStartTx=0,panStartTy=0,wasPinching=false;
+function applyZoom(){
+  zoomLayer.style.transform=`translate(${tx}px,${ty}px) scale(${scale})`;
+  reader.classList.toggle('zooming',scale>1.01);
+}
+function resetZoom(){
+  scale=1;tx=0;ty=0;applyZoom();
+}
+function dist(a,b){return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)}
+reader.addEventListener('touchstart',e=>{
+  if(e.touches.length===2){
+    wasPinching=true;
+    pinchStartDist=dist(e.touches[0],e.touches[1]);
+    pinchStartScale=scale;
+  }else if(e.touches.length===1 && scale>1){
+    panStartX=e.touches[0].clientX;panStartY=e.touches[0].clientY;
+    panStartTx=tx;panStartTy=ty;
+  }
+},{passive:true});
+reader.addEventListener('touchmove',e=>{
+  if(e.touches.length===2){
+    e.preventDefault();
+    const d=dist(e.touches[0],e.touches[1]);
+    scale=Math.max(1,Math.min(3.5,pinchStartScale*(d/pinchStartDist)));
+    if(scale===1){tx=0;ty=0}
+    applyZoom();
+  }else if(e.touches.length===1 && scale>1){
+    e.preventDefault();
+    tx=panStartTx+(e.touches[0].clientX-panStartX);
+    ty=panStartTy+(e.touches[0].clientY-panStartY);
+    applyZoom();
+  }
+},{passive:false});
+reader.addEventListener('touchend',e=>{
+  if(e.touches.length===0 && wasPinching){
+    wasPinching=false;
+    if(scale<1.08)resetZoom();
+  }
+},{passive:true});
+reader.addEventListener('dblclick',()=>{
+  if(scale>1)resetZoom();
+  else{scale=2;applyZoom();}
+});
+
+// Prevent page swipe while zoomed by intercepting the existing touchend handler's effect:
+// temporarily mark busy for the duration of a zoomed touch gesture.
+reader.addEventListener('touchstart',()=>{
+  if(scale>1.01) busy=true;
+},{passive:true});
+reader.addEventListener('touchend',()=>{
+  if(scale>1.01) setTimeout(()=>{busy=false},0);
+},{passive:true});
+
+showControls();
+
+
+function fitBookToViewport(){
+  const vv=window.visualViewport;
+  const vw=vv ? vv.width : window.innerWidth;
+  const vh=vv ? vv.height : window.innerHeight;
+  document.documentElement.style.setProperty('--app-vw',vw+'px');
+  document.documentElement.style.setProperty('--app-vh',vh+'px');
+  reader.style.width=vw+'px';
+  reader.style.height=vh+'px';
+
+  // Preserve the PDF/page aspect ratio and maximize the page within the visible viewport.
+  const ratio=1.4143577;
+  let w=vw, h=w/ratio;
+  if(h>vh){ h=vh; w=h*ratio; }
+  book.style.width=w+'px';
+  book.style.height=h+'px';
+}
+window.addEventListener('resize',fitBookToViewport);
+window.addEventListener('orientationchange',()=>setTimeout(fitBookToViewport,120));
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize',fitBookToViewport);
+}
+fitBookToViewport();
+
+paint();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load',async()=>{
+    try{
+      const reg=await navigator.serviceWorker.register('./sw.js?v=1');
+      await navigator.serviceWorker.ready;
+      const worker=reg.active||reg.waiting||reg.installing||navigator.serviceWorker.controller;
+      if(worker) worker.postMessage({type:'CACHE_ALL_PAGES'});
+    }catch(_){}
+  });
+}
+</script>
+</body>
+</html>
